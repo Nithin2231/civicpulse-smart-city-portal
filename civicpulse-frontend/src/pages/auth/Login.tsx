@@ -1,41 +1,41 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import API from '../../services/api'; // <-- UNCOMMENTED: Now it connects to your backend!
+import API from '../../services/api';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(''); // Added to show errors on the screen
+  const [errorMsg, setErrorMsg] = useState(''); 
   const navigate = useNavigate();
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await API.post('/auth/login', { email, password });
+      
+      // Save all user data to local storage
+      localStorage.setItem('name', response.data.name);
+      localStorage.setItem('email', response.data.username);
+      localStorage.setItem('role', response.data.role); 
 
-  // Inside Login.tsx
+      // Get the role once
+      const userRole = response.data.role;
 
-const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  try {
-    const response = await API.post('/auth/login', { email, password });
-    
-    // Save all user data to local storage
-    localStorage.setItem('name', response.data.name);
-    localStorage.setItem('email', response.data.username);
-    localStorage.setItem('role', response.data.role); // Crucial for routing
+      // === CLEANED UP REDIRECTION LOGIC ===
+      if (userRole === 'ROLE_ADMIN') {
+        navigate('/admin/dashboard');
+      } else if (userRole === 'ROLE_OFFICER') {
+        navigate('/officer/dashboard'); 
+      } else {
+        navigate('/citizen/dashboard'); 
+      }
 
-    const userRole = response.data.role;
-
-    // DIRECT REDIRECTION BASED ON ROLE
-    if (userRole === 'ROLE_ADMIN' || userRole === 'ROLE_OFFICER') {
-      navigate('/admin/dashboard'); // Send to the Command Center
-    } else {
-      navigate('/citizen/dashboard'); // Send to standard Citizen view
+    } catch (err) {
+      setErrorMsg("Login failed. Please check your credentials.");
     }
-
-  } catch (err) {
-    alert("Login failed. Please check your credentials.");
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-[#00AEEF] flex items-center justify-center p-4 font-sans text-[#1e293b]">

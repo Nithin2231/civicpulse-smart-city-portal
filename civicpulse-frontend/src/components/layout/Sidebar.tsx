@@ -1,13 +1,15 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, FileText, Settings, LogOut, ShieldAlert, Star } from 'lucide-react'; // Added Star icon here!
+import { LayoutDashboard, PlusCircle, FileText, Settings, LogOut, ShieldAlert, Star, BarChart } from 'lucide-react'; // <--- NEW: BarChart imported here
 
 const Sidebar = () => {
   const navigate = useNavigate();
   
-  // 1. Check who is currently logged in!
+  // Separate the roles so we can show different menus to different users
   const role = localStorage.getItem('role') || 'ROLE_CITIZEN';
-  const isAdmin = role === 'ROLE_ADMIN' || role === 'ROLE_OFFICER';
+  const isAdmin = role === 'ROLE_ADMIN';
+  const isOfficer = role === 'ROLE_OFFICER';
+  const isCitizen = role === 'ROLE_CITIZEN' || (!isAdmin && !isOfficer); // Default to citizen
 
   const handleLogout = () => {
     localStorage.clear();
@@ -37,28 +39,45 @@ const Sidebar = () => {
 
       {/* Navigation Links */}
       <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        
+        {/* Dynamic Menu Title */}
         <p className="px-4 text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
-          {isAdmin ? 'ADMIN MENU' : 'CITIZEN MENU'}
+          {isAdmin ? 'ADMIN MENU' : isOfficer ? 'OFFICER MENU' : 'CITIZEN MENU'}
         </p>
 
-        {/* Dynamic Dashboard Link */}
-        <NavLink 
-          to={isAdmin ? "/admin/dashboard" : "/citizen/dashboard"} 
-          className={linkStyles}
-        >
-          <LayoutDashboard size={20} /> Dashboard
-        </NavLink>
-
-        {/* === NEW: These links ONLY show for Admins === */}
+        {/* === ADMIN LINKS === */}
         {isAdmin && (
-          <NavLink to="/admin/feedback" className={linkStyles}>
-            <Star size={20} /> Citizen Feedback
-          </NavLink>
+          <>
+            <NavLink to="/admin/dashboard" className={linkStyles}>
+              <LayoutDashboard size={20} /> Dashboard
+            </NavLink>
+            <NavLink to="/admin/feedback" className={linkStyles}>
+              <Star size={20} /> Citizen Feedback
+            </NavLink>
+            <NavLink to="/admin/analytics" className={linkStyles}>
+              <BarChart size={20} /> Analytics & Reports
+            </NavLink>
+          </>
         )}
 
-        {/* These links ONLY show for Citizens */}
-        {!isAdmin && (
+        {/* === OFFICER LINKS === */}
+        {isOfficer && (
           <>
+            <NavLink to="/officer/dashboard" className={linkStyles}>
+              <FileText size={20} /> Assigned to Me
+            </NavLink>
+            <NavLink to="/officer/analytics" className={linkStyles}>
+              <BarChart size={20} /> Analytics & Reports
+            </NavLink>
+          </>
+        )}
+
+        {/* === CITIZEN LINKS === */}
+        {isCitizen && (
+          <>
+            <NavLink to="/citizen/dashboard" className={linkStyles}>
+              <LayoutDashboard size={20} /> Dashboard
+            </NavLink>
             <NavLink to="/citizen/submit-complaint" className={linkStyles}>
               <PlusCircle size={20} /> Report Issue
             </NavLink>
@@ -68,8 +87,9 @@ const Sidebar = () => {
           </>
         )}
 
+        {/* === SHARED SETTINGS LINK === */}
         <NavLink 
-          to={isAdmin ? "/admin/settings" : "/citizen/settings"} 
+          to={isAdmin ? "/admin/settings" : isOfficer ? "/officer/settings" : "/citizen/settings"} 
           className={linkStyles}
         >
           <Settings size={20} /> Settings

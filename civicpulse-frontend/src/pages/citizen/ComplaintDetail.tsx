@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Tag, FileText, CheckCircle, Clock, Send, AlertTriangle, XCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, CheckCircle, Clock, Image as ImageIcon, ShieldCheck, FileText } from 'lucide-react';
 import API from '../../services/api';
 
 const ComplaintDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
   const [complaint, setComplaint] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -16,135 +15,148 @@ const ComplaintDetail = () => {
 
   const fetchComplaintDetails = async () => {
     try {
-      const userEmail = localStorage.getItem('email') || '';
-      const response = await API.get(`/grievances/my?username=${userEmail}`);
+      const username = localStorage.getItem('email') || '';
+      // Fetching all complaints for the user and finding the specific one
+      const response = await API.get(`/grievances/my?username=${username}`);
       const foundComplaint = response.data.find((c: any) => c.id.toString() === id);
       
-      if (foundComplaint) setComplaint(foundComplaint);
-      else navigate('/citizen/my-complaints');
+      setComplaint(foundComplaint);
     } catch (error) {
-      console.error("Error fetching details:", error);
+      console.error("Error fetching complaint details:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return <div className="p-10 text-center font-bold text-gray-500 animate-pulse uppercase tracking-widest">Loading Ticket Details...</div>;
-  if (!complaint) return null;
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64 text-[#00AEEF]">
+        <p className="font-bold uppercase tracking-widest text-sm animate-pulse">Loading Details...</p>
+      </div>
+    );
+  }
 
-  const getStatusBadge = (status: string) => {
-    const s = status ? status.toUpperCase() : 'PENDING';
-    if (s === 'RESOLVED') return <span className="flex items-center gap-1.5 px-4 py-1.5 bg-green-50 text-green-600 border border-green-200 rounded-full text-xs font-black uppercase tracking-widest"><CheckCircle size={14}/> RESOLVED</span>;
-    if (s === 'FORWARDED') return <span className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-full text-xs font-black uppercase tracking-widest"><Send size={14}/> FORWARDED</span>;
-    if (s === 'IN PROGRESS') return <span className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-full text-xs font-black uppercase tracking-widest"><Clock size={14}/> IN PROGRESS</span>;
-    if (s === 'CANCELLED') return <span className="flex items-center gap-1.5 px-4 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-xs font-black uppercase tracking-widest"><XCircle size={14}/> CANCELLED</span>;
-    
-    return <span className="flex items-center gap-1.5 px-4 py-1.5 bg-orange-50 text-orange-600 border border-orange-200 rounded-full text-xs font-black uppercase tracking-widest"><Clock size={14}/> PENDING</span>;
-  };
+  if (!complaint) {
+    return (
+      <div className="text-center mt-10">
+        <p className="text-gray-500 font-bold">Complaint not found.</p>
+        <button onClick={() => navigate(-1)} className="mt-4 text-[#00AEEF] underline">Go Back</button>
+      </div>
+    );
+  }
+
+  const isResolved = complaint.status === 'RESOLVED';
 
   return (
-    <div className="p-4 md:p-6 font-sans max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto font-sans space-y-6">
       
-      <button onClick={() => navigate('/citizen/my-complaints')} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-[#00AEEF] transition-colors uppercase tracking-widest">
-        <ArrowLeft size={16} /> Back to My Complaints
-      </button>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="bg-[#1e293b] p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <p className="text-[#00AEEF] font-black text-xs uppercase tracking-widest mb-1">Ticket #CP-{complaint.id}</p>
-            <h1 className="text-2xl font-black">{complaint.title}</h1>
-          </div>
-          <div>{getStatusBadge(complaint.status)}</div>
+      {/* Header & Back Button */}
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={() => navigate('/citizen/my-complaints')}
+          className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-gray-500"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div>
+          <h1 className="text-2xl font-black text-[#1e293b] tracking-tight uppercase">Complaint Details</h1>
+          <p className="text-sm text-gray-500 mt-1 flex items-center gap-2 font-bold tracking-widest uppercase text-[10px]">
+            Ticket ID: <span className="text-[#00AEEF]">CP-{complaint.id}</span>
+          </p>
         </div>
+      </div>
 
-        <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {/* Left Column: Main Details */}
+        <div className="md:col-span-2 space-y-6">
           
-          <div className="space-y-6">
-            <div>
-              <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1"><Tag size={12} /> Category</p>
-              <p className="text-sm font-bold text-[#1e293b] bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 inline-block">{complaint.category || 'N/A'}</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <h2 className="text-lg font-black text-[#1e293b] uppercase">{complaint.title}</h2>
+              <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-1.5 ${
+                isResolved ? 'bg-green-100 text-green-700' : 
+                complaint.status === 'IN PROGRESS' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+              }`}>
+                {isResolved ? <CheckCircle size={14} /> : <Clock size={14} />}
+                {complaint.status}
+              </span>
             </div>
 
-            <div>
-              <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1"><Calendar size={12} /> Submitted On</p>
-              <p className="text-sm font-bold text-[#1e293b]">{new Date(complaint.createdAt).toLocaleString()}</p>
-            </div>
+            <p className="text-gray-600 text-sm leading-relaxed">{complaint.description}</p>
 
-            <div>
-              <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1"><MapPin size={12} /> Location</p>
-              <p className="text-sm font-bold text-[#1e293b] leading-relaxed">{complaint.location}</p>
-            </div>
-
-            <div>
-              <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1"><FileText size={12} /> Description</p>
-              <p className="text-sm text-gray-600 leading-relaxed bg-blue-50/50 p-4 rounded-xl border border-blue-50">{complaint.description}</p>
-            </div>
-
-            {/* Show Action Status OR Cancellation Reason */}
-            {complaint.status === 'CANCELLED' ? (
-              <div className="bg-red-50 rounded-2xl border border-red-200 p-5 mt-6">
-                <h3 className="text-xs font-black text-red-700 uppercase tracking-widest mb-2 flex items-center gap-2">
-                  <AlertTriangle size={14} /> Ticket Cancelled
-                </h3>
-                <p className="text-sm font-bold text-red-900 leading-relaxed">
-                  {complaint.cancellationReason || "This ticket was cancelled by the administrator."}
-                </p>
-              </div>
-            ) : complaint.department ? (
-              <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5 mt-6">
-                <h3 className="text-xs font-black text-[#1e293b] uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <AlertTriangle size={14} className="text-[#00AEEF]" /> Official Action Status
-                </h3>
-                
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Assigned Department</p>
-                    <p className="text-sm font-black text-[#00AEEF] uppercase">{complaint.department}</p>
-                  </div>
-                  <div className="flex gap-6 pt-2 border-t border-gray-200">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Priority</p>
-                      <p className={`text-xs font-bold ${complaint.priority === 'High' ? 'text-red-500' : 'text-gray-700'}`}>
-                        {complaint.priority}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Expected Resolution</p>
-                      <p className="text-xs font-bold text-gray-700">{complaint.deadline}</p>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            ) : (
-              <div className="text-center py-4 mt-6 border border-dashed border-gray-200 rounded-xl bg-gray-50">
-                <p className="text-xs font-bold text-gray-400">Waiting for Admin Assignment...</p>
-              </div>
-            )}
-          </div>
-
-          {/* Evidence Image Block */}
-          <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 flex flex-col">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 text-center">Attached Geo-Tagged Evidence</p>
-            <div className="w-full h-64 bg-white rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
-              {complaint.imagePath ? (
-                <img 
-                  // Use encodeURIComponent to handle spaces in filenames
-                  src={`http://localhost:8080/uploads/${encodeURIComponent(complaint.imagePath)}`} 
-                  alt="Evidence" 
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://placehold.co/400x300/e2e8f0/64748b?text=Image+Load+Error';
-                  }}
-                />
-              ) : (
-                <p className="text-xs font-bold text-gray-400">No Image Uploaded</p>
+            <div className="flex flex-col gap-3 pt-2 text-xs text-gray-500 font-bold uppercase tracking-widest">
+              <span className="flex items-center gap-2"><MapPin size={16} className="text-[#00AEEF]" /> {complaint.location}</span>
+              <span className="flex items-center gap-2"><Calendar size={16} className="text-[#00AEEF]" /> Submitted: {new Date(complaint.createdAt).toLocaleDateString()}</span>
+              {complaint.department && (
+                <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-[#00AEEF]" /> Assigned To: {complaint.department}</span>
               )}
             </div>
           </div>
 
+          {/* === NEW: OFFICER RESOLUTION BOX === */}
+          {(complaint.resolutionNotes || complaint.resolvedImagePath) && (
+            <div className="bg-green-50 rounded-2xl shadow-sm border border-green-200 p-6 space-y-4 animate-in fade-in zoom-in-95">
+              <h3 className="text-sm font-black text-green-800 uppercase tracking-widest flex items-center gap-2 border-b border-green-200 pb-2">
+                <CheckCircle size={18} className="text-green-600" /> Official Resolution Update
+              </h3>
+              
+              {complaint.resolutionNotes && (
+                <div className="flex gap-3 text-sm text-green-900 bg-white p-4 rounded-xl shadow-sm border border-green-100">
+                  <FileText size={18} className="text-green-500 flex-shrink-0 mt-0.5" />
+                  <p className="leading-relaxed font-medium">{complaint.resolutionNotes}</p>
+                </div>
+              )}
+
+              {complaint.resolvedImagePath && (
+                <div className="mt-4">
+                  <p className="text-[10px] font-bold text-green-700 uppercase tracking-widest mb-2">Proof of Resolution</p>
+                  <div className="w-full h-48 bg-white rounded-xl overflow-hidden border border-green-200 shadow-sm relative group">
+                    <img 
+                      src={`http://localhost:8080/uploads/${encodeURIComponent(complaint.resolvedImagePath)}`} 
+                      alt="Resolution Proof" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x200?text=Image+Unavailable';
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
+
+        {/* Right Column: Original Evidence */}
+        <div className="md:col-span-1">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-6">
+            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Your Original Evidence</h3>
+            
+            <div className="w-full aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-100 flex items-center justify-center">
+              {complaint.imagePath ? (
+                <img 
+                  src={`http://localhost:8080/uploads/${encodeURIComponent(complaint.imagePath)}`} 
+                  alt="Original Evidence" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300?text=No+Image';
+                  }}
+                />
+              ) : (
+                <div className="text-gray-300 flex flex-col items-center">
+                  <ImageIcon size={32} />
+                  <span className="text-xs mt-2 font-bold uppercase tracking-widest">No Image</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 text-xs text-blue-800 font-medium">
+              Geotagged image successfully verified and submitted to the municipal database.
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );

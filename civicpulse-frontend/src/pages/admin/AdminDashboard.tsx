@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, Clock, Eye, Filter, X, MapPin, Calendar, Image as ImageIcon, Send, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, Eye, Filter, X, ShieldCheck, Activity, CheckSquare, AlertCircle, Building, Calendar, Flag, Send, XCircle } from 'lucide-react';
 import API from '../../services/api';
 
 const AdminDashboard = () => {
@@ -7,15 +7,16 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
   const [selectedComplaint, setSelectedComplaint] = useState<any>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Assignment State
   const [assignDept, setAssignDept] = useState('');
-  const [customDept, setCustomDept] = useState(''); // NEW: For "Other" department
-  const [assignPriority, setAssignPriority] = useState('Medium');
+  const [customDept, setCustomDept] = useState(''); 
+  const [assignPriority, setAssignPriority] = useState('MEDIUM');
   const [assignDeadline, setAssignDeadline] = useState('');
 
   // Cancellation State
-  const [cancelReason, setCancelReason] = useState(''); // NEW: For cancelling
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     fetchAllComplaints();
@@ -24,7 +25,9 @@ const AdminDashboard = () => {
   const fetchAllComplaints = async () => {
     try {
       const response = await API.get('/grievances/all');
-      setComplaints(response.data);
+      // Sort newest first
+      const sorted = response.data.sort((a: any, b: any) => b.id - a.id);
+      setComplaints(sorted);
     } catch (error) {
       console.error("Error fetching admin data:", error);
     } finally {
@@ -44,8 +47,8 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleAssign = async () => {
-    // Check if "Other" was selected and use the custom department name
+  const handleAssign = async (e: React.FormEvent) => {
+    e.preventDefault();
     const finalDepartment = assignDept === 'Other' ? customDept : assignDept;
 
     if (!finalDepartment || !assignDeadline) {
@@ -53,23 +56,31 @@ const AdminDashboard = () => {
       return;
     }
 
+    setIsUpdating(true);
     try {
-      await API.put(`/grievances/assign/${selectedComplaint.id}?department=${finalDepartment}&priority=${assignPriority}&deadline=${assignDeadline}`);
-      alert("Grievance forwarded successfully!");
+      await API.put(`/grievances/assign/${selectedComplaint.id}?department=${encodeURIComponent(finalDepartment)}&priority=${encodeURIComponent(assignPriority)}&deadline=${encodeURIComponent(assignDeadline)}`);
+      
+      if (selectedComplaint.status === 'PENDING') {
+        await API.put(`/grievances/update-status/${selectedComplaint.id}?status=FORWARDED`);
+      }
+
+      alert("Ticket assigned and forwarded successfully!");
       setSelectedComplaint(null);
       fetchAllComplaints();
-      setAssignDept(''); setCustomDept(''); setAssignPriority('Medium'); setAssignDeadline('');
+      setAssignDept(''); setCustomDept(''); setAssignPriority('MEDIUM'); setAssignDeadline('');
     } catch (error) {
       alert("Error assigning grievance.");
+    } finally {
+      setIsUpdating(false);
     }
   };
 
-  // NEW: Handle Ticket Cancellation
   const handleCancel = async () => {
     if (!cancelReason.trim()) {
       alert("You must provide a reason for cancellation.");
       return;
     }
+    setIsUpdating(true);
     try {
       await API.put(`/grievances/cancel/${selectedComplaint.id}?reason=${encodeURIComponent(cancelReason)}`);
       alert("Grievance cancelled.");
@@ -78,231 +89,301 @@ const AdminDashboard = () => {
       setCancelReason('');
     } catch (error) {
       alert("Error cancelling grievance.");
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   const filteredComplaints = filter === 'ALL' ? complaints : complaints.filter(c => c.status === filter);
 
+  const totalCount = complaints.length;
+  const pendingCount = complaints.filter(c => c.status === 'PENDING').length;
+  const forwardedCount = complaints.filter(c => c.status === 'FORWARDED' || c.status === 'IN PROGRESS').length;
+  const resolvedCount = complaints.filter(c => c.status === 'RESOLVED').length;
+
   return (
-    <div className="p-6 font-sans max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-[#1e293b] uppercase tracking-tight">Municipal Command Center</h1>
-          <p className="text-gray-500 text-sm mt-1">Assign, track, and resolve citizen grievances.</p>
-        </div>
+    <div className="p-4 md:p-6 max-w-7xl mx-auto font-sans">
+      
+      {/* === HERO BANNER === */}
+      <div className="bg-gradient-to-r from-[#1e293b] to-[#0f172a] rounded-2xl p-8 mb-6 text-white shadow-lg relative overflow-hidden">
+        <div className="absolute -right-10 -top-10 w-64 h-64 bg-[#00AEEF] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
+        <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
         
-        <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-xl bg-white shadow-sm">
-          <Filter size={16} className="text-gray-400" />
-          <select 
-            value={filter} 
-            onChange={(e) => setFilter(e.target.value)}
-            className="text-xs font-bold text-gray-600 focus:outline-none cursor-pointer uppercase tracking-widest bg-transparent"
-          >
-            <option value="ALL">All Tickets</option>
-            <option value="PENDING">Pending</option>
-            <option value="FORWARDED">Forwarded</option>
-            <option value="IN PROGRESS">In Progress</option>
-            <option value="RESOLVED">Resolved</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight flex items-center gap-3 mb-2 uppercase">
+              <ShieldCheck className="text-[#00AEEF]" size={32} /> 
+              MUNICIPAL <span className="text-[#00AEEF]">COMMAND CENTER</span>
+            </h1>
+            <p className="text-gray-400 text-sm">Assign, track, and resolve citizen grievances city-wide.</p>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-white/10 border border-white/20 p-2 rounded-xl backdrop-blur-sm">
+            <Filter size={18} className="text-[#00AEEF] ml-2" />
+            <select 
+              value={filter} 
+              onChange={(e) => setFilter(e.target.value)}
+              className="bg-transparent text-sm font-bold text-white focus:outline-none cursor-pointer py-1 pr-4 appearance-none"
+            >
+              <option value="ALL" className="text-black">All Tickets</option>
+              <option value="PENDING" className="text-black">Pending</option>
+              <option value="FORWARDED" className="text-black">Forwarded</option>
+              <option value="IN PROGRESS" className="text-black">In Progress</option>
+              <option value="RESOLVED" className="text-black">Resolved</option>
+              <option value="CANCELLED" className="text-black">Cancelled</option>
+            </select>
+          </div>
         </div>
       </div>
 
+      {/* === QUICK STATS CARDS === */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+          <div className="bg-gray-100 p-3 rounded-lg text-gray-600"><Activity size={20} /></div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Tickets</p>
+            <p className="text-xl font-black text-[#1e293b]">{totalCount}</p>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-red-50 shadow-sm flex items-center gap-4">
+          <div className="bg-red-50 p-3 rounded-lg text-red-500"><AlertCircle size={20} /></div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">New / Pending</p>
+            <p className="text-xl font-black text-red-600">{pendingCount}</p>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-blue-50 shadow-sm flex items-center gap-4">
+          <div className="bg-blue-50 p-3 rounded-lg text-blue-500"><Clock size={20} /></div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Forwarded</p>
+            <p className="text-xl font-black text-blue-600">{forwardedCount}</p>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl border border-green-50 shadow-sm flex items-center gap-4">
+          <div className="bg-green-50 p-3 rounded-lg text-green-500"><CheckSquare size={20} /></div>
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Resolved</p>
+            <p className="text-xl font-black text-green-600">{resolvedCount}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* === MAIN TABLE === */}
       {loading ? (
         <p className="text-center py-20 font-bold text-gray-400 animate-pulse uppercase tracking-widest">Accessing Secure Records...</p>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            {/* ... TABLE HEADERS REMAIN THE SAME ... */}
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">ID</th>
-                <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Citizen / Title</th>
-                <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Category</th>
-                <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</th>
-                <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filteredComplaints.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-sm font-bold text-gray-400">No complaints match this filter.</td></tr>
-              ) : (
-                filteredComplaints.map((item) => (
-                  <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="p-4 text-xs font-black text-gray-400">#CP-{item.id}</td>
-                    <td className="p-4">
-                      <p className="text-sm font-bold text-[#1e293b]">{item.title}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">{item.user?.name || 'Unknown User'}</p>
-                    </td>
-                    <td className="p-4"><span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-1 rounded-md uppercase">{item.category}</span></td>
-                    <td className="p-4">
-                      {item.department ? (
-                        <div>
-                           <p className="text-[10px] font-black text-[#00AEEF] uppercase">{item.department}</p>
-                           <p className="text-[10px] text-gray-500 font-bold">Due: {item.deadline}</p>
-                        </div>
-                      ) : <span className="text-[10px] text-gray-400 italic">Unassigned</span>}
-                    </td>
-                    <td className="p-4">
-                      <span className={`text-[10px] font-black px-3 py-1 rounded-full border uppercase ${
-                        item.status === 'RESOLVED' ? 'bg-green-50 text-green-600 border-green-100' : 
-                        item.status === 'FORWARDED' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
-                        item.status === 'CANCELLED' ? 'bg-red-50 text-red-600 border-red-100' : 
-                        'bg-orange-50 text-orange-600 border-orange-100'
-                      }`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <select 
-                          onChange={(e) => updateStatus(item.id, e.target.value)}
-                          value={item.status}
-                          className="text-[10px] font-bold border border-gray-200 rounded-lg p-1.5 focus:outline-none focus:border-[#00AEEF] cursor-pointer"
-                        >
-                          <option value="PENDING">Set Pending</option>
-                          <option value="FORWARDED">Set Forwarded</option>
-                          <option value="IN PROGRESS">Set In Progress</option>
-                          <option value="RESOLVED">Set Resolved</option>
-                          <option value="CANCELLED">Set Cancelled</option>
-                        </select>
-                        <button onClick={() => setSelectedComplaint(item)} className="p-2 text-gray-400 hover:text-[#00AEEF] bg-gray-50 hover:bg-blue-50 rounded-lg transition-all" title="View & Assign">
-                          <Eye size={16}/>
-                        </button>
-                      </div>
-                    </td>
+          {filteredComplaints.length === 0 ? (
+            <div className="p-12 text-center text-gray-500 font-bold uppercase tracking-widest text-sm flex flex-col items-center gap-3">
+              <CheckCircle size={40} className="text-gray-300" />
+              No complaints match this filter.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-600">
+                <thead className="bg-gray-50 text-[10px] uppercase font-bold text-gray-500 tracking-widest border-b border-gray-100">
+                  <tr>
+                    <th className="p-5">ID</th>
+                    <th className="p-5">Issue Details</th>
+                    <th className="p-5">Department Assignment</th>
+                    <th className="p-5">Status</th>
+                    <th className="p-5 text-right">Actions</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredComplaints.map((c) => (
+                    <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-5 font-black text-[#00AEEF]">CP-{c.id}</td>
+                      <td className="p-5">
+                        <p className="font-bold text-[#1e293b]">{c.title}</p>
+                        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest mt-1">
+                          {c.category} • {c.user?.name || 'Unknown User'}
+                        </p>
+                      </td>
+                      <td className="p-5">
+                        {c.department ? (
+                          <div>
+                            <p className="font-bold text-[#1e293b] text-[11px] uppercase tracking-wider flex items-center gap-1.5"><Building size={12} className="text-[#00AEEF]"/> {c.department}</p>
+                            {c.deadline && <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Due: {new Date(c.deadline).toLocaleDateString()}</p>}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-red-500 font-bold uppercase tracking-widest bg-red-50 px-2 py-1 rounded">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="p-5">
+                        <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-md flex items-center gap-1.5 w-max ${
+                          c.status === 'RESOLVED' ? 'bg-green-50 text-green-600 border border-green-200' : 
+                          c.status === 'FORWARDED' ? 'bg-blue-50 text-blue-600 border border-blue-200' : 
+                          c.status === 'CANCELLED' ? 'bg-red-50 text-red-600 border border-red-200' : 
+                          'bg-orange-50 text-orange-600 border border-orange-200'
+                        }`}>
+                          {c.status}
+                        </span>
+                      </td>
+                      <td className="p-5 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <select 
+                            onChange={(e) => updateStatus(c.id, e.target.value)}
+                            value={c.status}
+                            className="text-[10px] font-bold border border-gray-200 rounded-lg p-2 focus:outline-none focus:border-[#00AEEF] cursor-pointer bg-white"
+                          >
+                            <option value="PENDING">Set Pending</option>
+                            <option value="FORWARDED">Set Forwarded</option>
+                            <option value="IN PROGRESS">Set In Progress</option>
+                            <option value="RESOLVED">Set Resolved</option>
+                            <option value="CANCELLED">Set Cancelled</option>
+                          </select>
+                          <button 
+                            onClick={() => {
+                              setSelectedComplaint(c);
+                              setAssignDept(c.department || '');
+                              setAssignPriority(c.priority || 'MEDIUM');
+                              setAssignDeadline(c.deadline || '');
+                            }}
+                            className="bg-white border border-gray-200 hover:border-[#00AEEF] hover:text-[#00AEEF] text-gray-600 px-3 py-2 rounded-lg transition-all shadow-sm"
+                            title="Review & Assign"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Modal View */}
+      {/* === NEW ASSIGNMENT MODAL (Matches Uploaded UI) === */}
       {selectedComplaint && (
-        <div className="fixed inset-0 bg-[#0f172a]/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col relative">
             
-            <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between p-8 pb-4 border-b border-gray-100">
               <div>
-                <p className="text-[#00AEEF] font-black text-[10px] uppercase tracking-widest mb-0.5">Ticket #CP-{selectedComplaint.id}</p>
-                <h2 className="text-xl font-black text-[#1e293b]">{selectedComplaint.title}</h2>
+                <p className="text-[11px] font-black text-[#00AEEF] uppercase tracking-widest mb-1 flex items-center gap-1"><Flag size={12}/> TICKET #CP-{selectedComplaint.id}</p>
+                <h2 className="text-2xl font-black text-[#1e293b] capitalize">{selectedComplaint.title}</h2>
               </div>
-              <button onClick={() => setSelectedComplaint(null)} className="p-2 bg-white border border-gray-200 rounded-full text-gray-400 hover:text-red-500 hover:border-red-200 transition-all shadow-sm">
+              <button onClick={() => setSelectedComplaint(null)} className="p-2 bg-white border border-gray-200 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-all shadow-sm">
                 <X size={20} />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Modal Body (Grid Layout) */}
+            <div className="p-8 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-10">
               
-              <div className="space-y-5">
+              {/* LEFT COLUMN: Texts and Forms */}
+              <div className="space-y-6 flex flex-col">
+                <h3 className="text-lg font-black text-[#1e293b]">{selectedComplaint.user?.name || 'Citizen User'}</h3>
+
+                {/* Description */}
                 <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Citizen Details</p>
-                  <p className="text-sm font-bold text-gray-800">{selectedComplaint.user?.name || 'Unknown'}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Description</p>
-                  <p className="text-sm text-gray-600 bg-blue-50/50 p-3 rounded-xl border border-blue-50/50 leading-relaxed">{selectedComplaint.description}</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Description</p>
+                  <div className="bg-gray-50/80 p-5 rounded-2xl border border-gray-100 text-sm text-gray-600 leading-relaxed">
+                    {selectedComplaint.description}
+                  </div>
                 </div>
 
-                {/* THE ASSIGNMENT PANEL */}
-                {selectedComplaint.status !== 'CANCELLED' && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-4">
-                    <h3 className="text-xs font-black text-[#1e293b] uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <Send size={14} className="text-[#00AEEF]" /> Department Assignment
-                    </h3>
-                    
-                    {selectedComplaint.department ? (
-                      <div className="space-y-2">
-                        <p className="text-sm font-bold text-green-600 bg-green-50 p-2 rounded-lg border border-green-100">✓ Assigned to {selectedComplaint.department}</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
+                {/* Conditional Logic: Forms vs Status Badges */}
+                {selectedComplaint.status === 'CANCELLED' ? (
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+                    <p className="text-xs font-black text-red-700 uppercase tracking-widest mb-2">Ticket Cancelled</p>
+                    <p className="text-sm text-red-900 font-bold">Reason: {selectedComplaint.cancellationReason || 'No reason provided.'}</p>
+                  </div>
+                ) : selectedComplaint.department && selectedComplaint.status !== 'PENDING' ? (
+                  <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6 flex items-center gap-3">
+                    <CheckCircle size={24} className="text-blue-600" /> 
+                    <p className="text-sm font-bold text-blue-700">Currently Forwarded to: {selectedComplaint.department}</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Assignment Box */}
+                    <form onSubmit={handleAssign} className="border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
+                      <h3 className="text-xs font-black text-[#1e293b] uppercase tracking-widest flex items-center gap-2 mb-4">
+                        <Send size={14} className="text-[#00AEEF]" /> Department Assignment
+                      </h3>
+                      
+                      <select 
+                        required value={assignDept} onChange={(e) => setAssignDept(e.target.value)}
+                        className="w-full p-3 border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-[#00AEEF] text-sm font-bold text-gray-700"
+                      >
+                        <option value="">Select Department Officer...</option>
+                        <option value="Water Board">Water Supply Board</option>
+                        <option value="Public Works">Public Works (Roads)</option>
+                        <option value="Electricity Dept">Electricity Department</option>
+                        <option value="Sanitation Dept">Waste & Sanitation</option>
+                        <option value="Other">Other (Specify Below)</option>
+                      </select>
+
+                      {assignDept === 'Other' && (
+                        <input 
+                          type="text" required placeholder="Specify Department Name..."
+                          value={customDept} onChange={(e) => setCustomDept(e.target.value)}
+                          className="w-full p-3 border border-[#00AEEF]/30 rounded-xl bg-blue-50/30 focus:outline-none focus:border-[#00AEEF] text-sm font-bold"
+                        />
+                      )}
+
+                      <div className="flex gap-4">
                         <select 
-                          required value={assignDept} onChange={(e) => setAssignDept(e.target.value)}
-                          className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00AEEF] font-bold text-gray-600"
+                          value={assignPriority} onChange={(e) => setAssignPriority(e.target.value)}
+                          className="w-1/3 p-3 border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-[#00AEEF] text-sm font-bold text-gray-700"
                         >
-                          <option value="">Select Department Officer...</option>
-                          <option value="Water Board">Water Supply Board</option>
-                          <option value="Public Works">Public Works (Roads)</option>
-                          <option value="Electricity Dept">Electricity Department</option>
-                          <option value="Sanitation Dept">Waste & Sanitation</option>
-                          <option value="Other">Other (Specify Below)</option>
+                          <option value="LOW">Low Pri</option>
+                          <option value="MEDIUM">Medium Pri</option>
+                          <option value="HIGH">High Pri</option>
+                          <option value="CRITICAL">Critical</option>
                         </select>
+                        <input 
+                          type="date" value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)} required
+                          className="w-2/3 p-3 border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-[#00AEEF] text-sm font-bold text-gray-600"
+                        />
+                      </div>
 
-                        {/* NEW: Input for "Other" department */}
-                        {assignDept === 'Other' && (
-                          <input 
-                            type="text" required placeholder="Specify Department Name..."
-                            value={customDept} onChange={(e) => setCustomDept(e.target.value)}
-                            className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00AEEF]"
-                          />
-                        )}
+                      <button type="submit" disabled={isUpdating} className="w-full bg-[#1e293b] hover:bg-black text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all mt-2">
+                        {isUpdating ? 'Processing...' : 'Forward Ticket'}
+                      </button>
+                    </form>
 
-                        <div className="flex gap-3">
-                          <select 
-                            value={assignPriority} onChange={(e) => setAssignPriority(e.target.value)}
-                            className="w-1/3 p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00AEEF] font-bold text-gray-600"
-                          >
-                            <option value="Low">Low Priority</option>
-                            <option value="Medium">Medium Priority</option>
-                            <option value="High">High Priority</option>
-                          </select>
-                          <input 
-                            type="date" required value={assignDeadline} onChange={(e) => setAssignDeadline(e.target.value)}
-                            className="w-2/3 p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00AEEF] text-gray-600"
-                          />
-                        </div>
-                        <button onClick={handleAssign} className="w-full bg-[#1e293b] hover:bg-black text-white py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all">
-                          Forward Ticket
+                    {/* Cancellation Box */}
+                    <div className="bg-red-50/30 border border-red-200 rounded-2xl p-6">
+                      <h3 className="text-xs font-black text-red-600 uppercase tracking-widest flex items-center gap-2 mb-4">
+                        <XCircle size={14} /> Reject / Cancel Ticket
+                      </h3>
+                      <div className="space-y-4">
+                        <textarea 
+                          placeholder="State reason for cancellation..."
+                          value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}
+                          className="w-full p-3 border border-red-200 rounded-xl text-sm focus:outline-none focus:border-red-400 bg-white resize-none"
+                          rows={2}
+                        />
+                        <button type="button" onClick={handleCancel} disabled={isUpdating} className="w-full bg-red-600 hover:bg-red-700 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md">
+                          Confirm Cancellation
                         </button>
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {/* NEW: CANCELLATION PANEL */}
-                {(!selectedComplaint.department && selectedComplaint.status !== 'CANCELLED') && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-4">
-                    <h3 className="text-xs font-black text-red-700 uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <XCircle size={14} /> Reject / Cancel Ticket
-                    </h3>
-                    <div className="space-y-3">
-                      <textarea 
-                        placeholder="State reason for cancellation..."
-                        value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}
-                        className="w-full p-2 border border-red-200 rounded-lg text-sm focus:outline-none focus:border-red-400"
-                        rows={2}
-                      />
-                      <button onClick={handleCancel} className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all">
-                        Confirm Cancellation
-                      </button>
                     </div>
-                  </div>
+                  </>
                 )}
-                
-                {/* Shows if already cancelled */}
-                {selectedComplaint.status === 'CANCELLED' && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-4">
-                     <p className="text-xs font-black text-red-700 uppercase tracking-widest mb-1">Cancelled</p>
-                     <p className="text-sm text-red-900 font-bold">Reason: {selectedComplaint.cancellationReason || 'No reason provided.'}</p>
-                  </div>
-                )}
-
               </div>
 
-              {/* Image Block */}
-              <div className="bg-gray-50 rounded-2xl border border-gray-200 p-3 flex flex-col h-full min-h-[300px]">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 text-center">Geo-Tagged Evidence</p>
-                <div className="flex-1 bg-white rounded-xl overflow-hidden border border-gray-100 flex items-center justify-center relative">
+              {/* RIGHT COLUMN: Big Image */}
+              <div className="flex flex-col h-full min-h-[400px]">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 text-center">Geo-Tagged Evidence</p>
+                <div className="flex-1 bg-gray-50 rounded-3xl overflow-hidden border border-gray-200 flex items-center justify-center relative shadow-inner">
                   {selectedComplaint.imagePath ? (
                     <img 
                       src={`http://localhost:8080/uploads/${encodeURIComponent(selectedComplaint.imagePath)}`} 
-                      alt="Evidence" className="w-full h-full object-cover"
+                      alt="Evidence" 
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
-                  ) : <p className="text-xs font-bold text-gray-400">No Image</p>}
+                  ) : (
+                    <div className="text-center">
+                      <AlertCircle size={32} className="text-gray-300 mx-auto mb-2" />
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">No Image Provided</p>
+                    </div>
+                  )}
                 </div>
               </div>
 

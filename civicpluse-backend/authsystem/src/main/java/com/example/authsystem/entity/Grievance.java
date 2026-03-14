@@ -84,4 +84,19 @@ public class Grievance {
 
     public String getCancellationReason() { return cancellationReason; }
     public void setCancellationReason(String cancellationReason) { this.cancellationReason = cancellationReason; }
+
+    // ... your existing fields ...
+
+    @Column(name = "resolution_notes", columnDefinition = "TEXT")
+    private String resolutionNotes;
+
+    @Column(name = "resolved_image_path")
+    private String resolvedImagePath;
+
+    // === ADD THESE TO YOUR GETTERS AND SETTERS ===
+    public String getResolutionNotes() { return resolutionNotes; }
+    public void setResolutionNotes(String resolutionNotes) { this.resolutionNotes = resolutionNotes; }
+
+    public String getResolvedImagePath() { return resolvedImagePath; }
+    public void setResolvedImagePath(String resolvedImagePath) { this.resolvedImagePath = resolvedImagePath; }
 }
