@@ -1,26 +1,23 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import Navbar from './Navbar';
+import AIChatbot from '../chatbot/AIChatbot'; // <-- Import the new chatbot
 
 const DashboardLayout = () => {
   return (
-  <div className="flex h-screen bg-gray-50">
-    {/* Fixed Sidebar */}
-    <div className="w-64 flex-shrink-0">
+    <div className="flex bg-[#f8fafc] min-h-screen">
+      {/* Sidebar stays fixed on the left */}
       <Sidebar />
-    </div>
+      
+      {/* Main content area takes up the rest of the space */}
+      <div className="flex-1 ml-64 p-8 overflow-y-auto">
+        <Outlet /> 
+      </div>
 
-    {/* Scrollable Main Content */}
-    <div className="flex-1 overflow-y-auto">
-      <Navbar /> {/* Your Top Navbar */}
-      <main className="p-4 md:p-8">
-        <Outlet /> {/* This renders your pages like Dashboard or Settings */}
-      </main>
+      {/* Render the floating chatbot here so it's on every page! */}
+      <AIChatbot />
     </div>
-  </div>
-);
-  
+  );
 };
 
 export default DashboardLayout;

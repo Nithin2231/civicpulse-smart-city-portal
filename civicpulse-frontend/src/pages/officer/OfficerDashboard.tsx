@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { UploadCloud, Image as ImageIcon, CheckCircle, Clock, Filter, ShieldCheck, Activity, CheckSquare } from 'lucide-react';
+import { UploadCloud, Image as ImageIcon, CheckCircle, Clock, Filter, ShieldCheck, Activity, CheckSquare, X, AlertCircle } from 'lucide-react';
 import API from '../../services/api';
 
-// Updated to match the exact names in your database screenshots
 const DEPARTMENTS = [
   "ALL DEPARTMENTS",
   "WATER BOARD",
@@ -39,17 +38,15 @@ const OfficerDashboard = () => {
     }
   };
 
-  // === THE BUG FIX: Case-Insensitive Filtering ===
   const displayedGrievances = selectedDept === 'ALL DEPARTMENTS' 
     ? allAssignedGrievances 
     : allAssignedGrievances.filter(g => 
         g.department?.toUpperCase() === selectedDept.toUpperCase()
       );
 
-  // Quick Stats for the new UI
   const totalCount = displayedGrievances.length;
   const resolvedCount = displayedGrievances.filter(g => g.status === 'RESOLVED').length;
-  const pendingCount = totalCount - resolvedCount;
+  const pendingCount = totalCount - resolvedCount - displayedGrievances.filter(g => g.status === 'CANCELLED').length;
 
   const openResolutionModal = (grievance: any) => {
     setSelectedGrievance(grievance);
@@ -80,7 +77,6 @@ const OfficerDashboard = () => {
       fetchAssignedGrievances(); 
     } catch (error) {
       alert("Failed to update grievance.");
-      console.error(error);
     } finally {
       setIsUpdating(false);
     }
@@ -89,9 +85,8 @@ const OfficerDashboard = () => {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans">
       
-      {/* === NEW ATTRACTIVE HERO BANNER === */}
+      {/* === HERO BANNER === */}
       <div className="bg-gradient-to-r from-[#1e293b] to-[#0f172a] rounded-2xl p-8 mb-6 text-white shadow-lg relative overflow-hidden">
-        {/* Decorative background circle */}
         <div className="absolute -right-10 -top-10 w-64 h-64 bg-[#00AEEF] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -103,7 +98,6 @@ const OfficerDashboard = () => {
             <p className="text-gray-400 text-sm">Review, manage, and resolve tickets assigned to municipal departments.</p>
           </div>
           
-          {/* Filter Dropdown moved to the banner for a cleaner look */}
           <div className="flex items-center gap-2 bg-white/10 border border-white/20 p-2 rounded-xl backdrop-blur-sm">
             <Filter size={18} className="text-[#00AEEF] ml-2" />
             <select 
@@ -119,7 +113,7 @@ const OfficerDashboard = () => {
         </div>
       </div>
 
-      {/* === NEW QUICK STATS CARDS === */}
+      {/* === QUICK STATS CARDS === */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
           <div className="bg-blue-50 p-3 rounded-lg text-blue-500"><Activity size={20} /></div>
@@ -171,6 +165,7 @@ const OfficerDashboard = () => {
                   <td className="p-5">
                     <span className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-md flex items-center gap-1.5 w-max ${
                       g.status === 'RESOLVED' ? 'bg-green-50 text-green-600 border border-green-200' : 
+                      g.status === 'CANCELLED' ? 'bg-red-50 text-red-600 border border-red-200' :
                       g.status === 'IN PROGRESS' ? 'bg-blue-50 text-blue-600 border border-blue-200' :
                       'bg-orange-50 text-orange-600 border border-orange-200'
                     }`}>
@@ -193,77 +188,134 @@ const OfficerDashboard = () => {
         )}
       </div>
 
-      {/* RESOLUTION MODAL */}
+      {/* === FIX: BEAUTIFUL, ALIGNED SPLIT-PANE RESOLUTION MODAL === */}
       {selectedGrievance && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/80 p-4 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-gray-100">
-            <h2 className="text-xl font-black text-[#1e293b] uppercase tracking-tight mb-4 flex items-center gap-2 border-b border-gray-100 pb-4">
-              <UploadCloud className="text-[#00AEEF]" /> Update Ticket CP-{selectedGrievance.id}
-            </h2>
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] shadow-2xl border border-gray-100 overflow-hidden flex flex-col relative">
             
-            <form onSubmit={handleUpdate} className="space-y-5 mt-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Mark Status</label>
-                <select 
-                  value={status} onChange={(e) => setStatus(e.target.value)}
-                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-[#00AEEF] focus:ring-2 focus:ring-[#00AEEF]/20 text-sm font-bold transition-all"
-                >
-                  <option value="IN PROGRESS">In Progress</option>
-                  <option value="RESOLVED">Resolved</option>
-                </select>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-8 py-5 border-b border-gray-100 bg-gray-50/50">
+              <div>
+                <p className="text-[10px] font-black text-[#00AEEF] uppercase tracking-widest mb-0.5">TICKET #CP-{selectedGrievance.id}</p>
+                <h2 className="text-xl font-black text-[#1e293b] capitalize">{selectedGrievance.title}</h2>
               </div>
+              <button onClick={() => setSelectedGrievance(null)} className="p-2 bg-white border border-gray-200 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-all shadow-sm">
+                <X size={18} />
+              </button>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Resolution Notes *</label>
-                <textarea 
-                  rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} required
-                  placeholder="Describe the action taken to fix this..."
-                  className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-[#00AEEF] focus:ring-2 focus:ring-[#00AEEF]/20 text-sm resize-none transition-all"
-                />
-              </div>
+            {/* Modal Body (Strict Grid Layout to prevent scrolling issues) */}
+            <div className="p-8 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+              
+              {/* LEFT COLUMN: Original Citizen Complaint Details */}
+              <div className="space-y-6 flex flex-col">
+                
+                {/* Fixed Text Alignment */}
+                <div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Reported By</h3>
+                  <p className="text-sm font-bold text-[#1e293b]">{selectedGrievance.user?.name || 'Citizen User'}</p>
+                </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
-                  Upload Proof Image {status === 'RESOLVED' && <span className="text-red-500">*</span>}
-                </label>
-                <div className={`w-full border-2 border-dashed ${file ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50'} rounded-xl p-5 flex flex-col items-center justify-center transition-colors`}>
-                  {file ? (
-                    <div className="text-center">
-                      <ImageIcon size={28} className="mx-auto text-green-500 mb-2" />
-                      <p className="text-xs font-bold text-green-700">{file.name}</p>
-                      <button type="button" onClick={() => setFile(null)} className="text-[10px] text-red-500 uppercase tracking-widest mt-2 hover:underline">Remove</button>
-                    </div>
-                  ) : (
-                    <>
-                      <UploadCloud size={28} className="text-gray-400 mb-3" />
-                      <input 
-                        type="file" accept="image/*" 
-                        onChange={(e) => setFile(e.target.files?.[0] || null)}
-                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:bg-[#00AEEF] file:text-white hover:file:bg-[#0081C9] cursor-pointer transition-all"
+                {/* Fixed Description Box padding */}
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Description of Issue</p>
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm text-gray-600 leading-relaxed min-h-[80px]">
+                    {selectedGrievance.description}
+                  </div>
+                </div>
+
+                {/* Fixed Image height so it doesn't stretch the modal */}
+                <div>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Original Evidence</p>
+                  <div className="w-full h-56 bg-gray-50 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center relative shadow-sm">
+                    {selectedGrievance.imagePath ? (
+                      <img 
+                        src={`http://localhost:8080/uploads/${encodeURIComponent(selectedGrievance.imagePath)}`} 
+                        alt="Evidence" 
+                        className="w-full h-full object-cover"
                       />
-                      {status === 'RESOLVED' && (
-                        <p className="text-[10px] text-red-500 uppercase tracking-widest mt-3 font-bold bg-red-50 px-3 py-1 rounded-full">Required for Resolution</p>
-                      )}
-                    </>
-                  )}
+                    ) : (
+                      <div className="text-center">
+                        <AlertCircle size={28} className="text-gray-300 mx-auto mb-1" />
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">No Image</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button 
-                  type="button" onClick={() => setSelectedGrievance(null)}
-                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" disabled={isUpdating}
-                  className="flex-1 py-3 bg-[#00AEEF] hover:bg-[#0081C9] text-white rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-md transition-all disabled:opacity-50"
-                >
-                  {isUpdating ? 'Saving...' : 'Save Update'}
-                </button>
+              {/* RIGHT COLUMN: Officer Resolution Form */}
+              <div className="flex flex-col">
+                {selectedGrievance.status === 'CANCELLED' ? (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+                    <p className="text-xs font-black text-red-700 uppercase tracking-widest mb-1">Ticket Cancelled</p>
+                    <p className="text-sm text-red-900 font-medium">This ticket was cancelled by the Admin and requires no further action.</p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleUpdate} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-[0_0_40px_-15px_rgba(0,0,0,0.1)] space-y-4 h-full flex flex-col">
+                    <h3 className="text-xs font-black text-[#1e293b] uppercase tracking-widest flex items-center gap-2 mb-2 border-b border-gray-100 pb-3">
+                      <UploadCloud size={16} className="text-[#00AEEF]" /> Resolution Panel
+                    </h3>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mark Status</label>
+                      <select 
+                        value={status} onChange={(e) => setStatus(e.target.value)}
+                        className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-[#00AEEF] text-sm font-bold text-gray-700"
+                      >
+                        <option value="FORWARDED">Acknowledged (Pending)</option>
+                        <option value="IN PROGRESS">In Progress</option>
+                        <option value="RESOLVED">Resolved</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Resolution Notes *</label>
+                      <textarea 
+                        rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} required
+                        placeholder="Describe the action taken to fix this..."
+                        className="w-full p-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-[#00AEEF] text-sm resize-none"
+                      />
+                    </div>
+
+                    {/* FIX: Custom File Upload Button */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                        Upload Proof Image {status === 'RESOLVED' && <span className="text-red-500">*</span>}
+                      </label>
+                      
+                      <label className={`w-full border-2 border-dashed ${file ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:border-[#00AEEF] hover:bg-blue-50/50'} rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-all`}>
+                        {file ? (
+                          <div className="text-center">
+                            <ImageIcon size={24} className="mx-auto text-green-500 mb-1" />
+                            <p className="text-xs font-bold text-green-700 truncate max-w-[200px]">{file.name}</p>
+                            <p className="text-[10px] text-red-500 uppercase tracking-widest mt-1 hover:underline">Click to change</p>
+                          </div>
+                        ) : (
+                          <>
+                            <UploadCloud size={20} className="text-[#00AEEF] mb-2" />
+                            <span className="bg-[#00AEEF] text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest mb-1 shadow-sm">
+                              Choose File
+                            </span>
+                            <span className="text-[10px] text-gray-400">No file chosen</span>
+                          </>
+                        )}
+                        {/* Hidden native file input */}
+                        <input 
+                          type="file" accept="image/*" className="hidden"
+                          onChange={(e) => setFile(e.target.files?.[0] || null)}
+                        />
+                      </label>
+                    </div>
+
+                    <button type="submit" disabled={isUpdating} className="w-full bg-[#1e293b] hover:bg-black text-white py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-md disabled:opacity-50 mt-auto">
+                      {isUpdating ? 'Saving...' : 'Save Resolution Update'}
+                    </button>
+                  </form>
+                )}
               </div>
-            </form>
+
+            </div>
           </div>
         </div>
       )}
