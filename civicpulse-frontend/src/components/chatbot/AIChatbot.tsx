@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, User, Sparkles } from 'lucide-react';
+import { X, Send, Bot, User, Sparkles } from 'lucide-react';
+import { useLocation } from 'react-router-dom'; // <-- IMPORT THIS!
 
 interface Message {
   text: string;
@@ -14,6 +15,13 @@ const AIChatbot = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // === THE BULLETPROOF FIX ===
+  const location = useLocation();
+  // If the URL does NOT contain "/citizen", completely destroy the chatbot component
+  if (!location.pathname.startsWith('/citizen')) {
+    return null; 
+  }
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -30,17 +38,14 @@ const AIChatbot = () => {
     setIsLoading(true);
 
     try {
-      // 1. Get the API Key from your .env file
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
       if (!apiKey) {
-        throw new Error("API Key missing! Please add VITE_GEMINI_API_KEY to your .env file.");
+        throw new Error("API Key missing! Please add VITE_GEMINI_API_KEY to your .env file and restart the server.");
       }
 
-      // 2. The System Prompt (Tells the AI how to behave)
       const systemPrompt = "You are CivicBot, a helpful assistant for the CivicPulse Smart City Portal. You help citizens know how to report grievances (like potholes, water leaks, electricity issues), understand municipal services, and track issues. Keep your answers short, polite, and formatted nicely. Do not use complex markdown.";
 
-      // 3. Call the Google Gemini API directly
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -62,7 +67,7 @@ const AIChatbot = () => {
 
     } catch (error: any) {
       console.error("AI Error:", error);
-      setMessages(prev => [...prev, { text: `Oops! Something went wrong: ${error.message || "Please check your API key."}`, isBot: true }]);
+      setMessages(prev => [...prev, { text: `Oops! Something went wrong: ${error.message}`, isBot: true }]);
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +77,7 @@ const AIChatbot = () => {
     <div className="fixed bottom-6 right-6 z-[100] font-sans">
       {/* The Floating Chat Window */}
       {isOpen && (
-        <div className="absolute bottom-16 right-0 w-[350px] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 mb-4">
+        <div className="absolute bottom-20 right-0 w-[350px] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 mb-4">
           
           {/* Header */}
           <div className="bg-gradient-to-r from-[#1e293b] to-[#0f172a] p-4 flex items-center justify-between text-white">
@@ -145,12 +150,21 @@ const AIChatbot = () => {
       )}
 
       {/* The Floating Toggle Button */}
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className={`${isOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-[#00AEEF] hover:bg-[#0081C9]'} text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 flex items-center justify-center`}
-      >
-        {isOpen ? <X size={28} /> : <MessageSquare size={28} />}
-      </button>
+      <div className="relative flex flex-col items-center">
+        {!isOpen && (
+          <div className="absolute -top-12 bg-white text-[#1e293b] text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl shadow-lg border border-gray-100 whitespace-nowrap animate-bounce flex items-center gap-1">
+            Ask CivicBot <Sparkles size={12} className="text-yellow-400" />
+            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b border-r border-gray-100 rotate-45"></div>
+          </div>
+        )}
+
+        <button 
+          onClick={() => setIsOpen(!isOpen)}
+          className={`${isOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-[#00AEEF] hover:bg-[#0081C9]'} text-white p-4 rounded-full shadow-2xl transition-all hover:scale-110 flex items-center justify-center`}
+        >
+          {isOpen ? <X size={28} /> : <Bot size={28} />}
+        </button>
+      </div>
     </div>
   );
 };
